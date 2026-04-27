@@ -38,3 +38,4 @@ deps/**/user.toml
 *.etli
 
 /source
+.gitnexus

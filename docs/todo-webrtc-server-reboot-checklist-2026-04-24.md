@@ -2,6 +2,11 @@
 
 日期：2026-04-24
 
+後續結果：
+
+- 已完成的正式排查與修復紀錄請見：
+  - `docs/issue-webrtc-framegrabfailed-resolution-mismatch-2026-04-27.md`
+
 ## 目的
 
 在不修改 `server` repo source code 或 repo 設定的前提下，記錄目前 `ezplus.bim_review_stream_streaming.kit` 的盤查結果，以及重開機後的驗證步驟。
