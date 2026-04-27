@@ -311,3 +311,97 @@ Cannot stream video frame with resolution `1920x1062` that differs from that of 
    - `--/app/window/height=1079 --/app/window/width=1920`
 4. 若之後要恢復 `1920x1080` 協商，需先確認 server 實際能穩定輸出 `1920x1080`，否則同樣會重現 mismatch。
 5. 若再次看到 `Device lost`，先確認前面是否先出現 resolution mismatch，不要直接把問題歸到 GPU driver。
+
+## 架構角色說明
+
+這次排查中，最容易混淆的是 `bim-streaming-server`、`49100`、`web-viewer-sample` 與 `5173` 分別代表什麼。
+
+### 1. `bim-streaming-server` 是 Kit app + WebRTC stream server
+
+`bim-streaming-server` 這個 repo 產出的 `ezplus.bim_review_stream_streaming.kit`，同時扮演兩個角色：
+
+- `Kit viewer`：
+  - 本機會開出 Omniverse / Kit 原生視窗
+  - 視窗裡的主要內容是 `Viewport`
+  - 這就是 server 端實際 render 的畫面來源
+- `WebRTC stream server`：
+  - 將上面的 viewport 畫面編碼後對外提供 WebRTC signaling / media
+  - 本次主要驗證的 signaling 入口是 `49100`
+
+也就是說，`bim-streaming-server` 自己有 viewer，但那個 viewer 是 `Kit 原生視窗`，不是獨立的瀏覽器頁面。
+
+### 2. `web-viewer-sample` 是 browser viewer client 範例
+
+`web-viewer-sample` 不是 stream server，本質上是：
+
+- 一個示範如何在瀏覽器中嵌入 NVIDIA WebRTC streaming library 的 sample client
+- 一個示範如何建立 WebRTC 連線、接收畫面、送控制訊息的範例 viewer
+
+它的 `5173` 只是 Vite dev server 提供出來的前端頁面埠，作用是：
+
+- 把 sample viewer 網頁送到瀏覽器
+- 讓瀏覽器中的 JavaScript 再去連真正的 stream server
+
+所以：
+
+- `5173` 不是 WebRTC stream server
+- `49100` 才是這次主要的 WebRTC signaling / streaming 入口
+
+### 3. 別台電腦若無法開 `192.168.10.105:5173`，不代表 stream server 沒開
+
+本次另行確認到：
+
+- `49100` 是綁在 `0.0.0.0:49100`
+- 代表 `Kit` 這一側的 stream server 允許其他 IP 嘗試連入
+
+但 `web-viewer-sample` 的 Vite dev server 若只綁 `localhost` 或 `::1`，那別台電腦打：
+
+```text
+http://192.168.10.105:5173
+```
+
+仍然會失敗。這代表：
+
+- 失敗的是 sample viewer 頁面沒有對外提供
+- 不代表 `49100` 那個 WebRTC server 本身一定沒對外開
+
+### 4. `web-viewer-sample` 預設 local mode 也可能把連線指到錯的主機
+
+若 `web-viewer-sample` 的 `stream.config.json` 仍是：
+
+```json
+"local": {
+  "server": "127.0.0.1",
+  "signalingPort": 49100
+}
+```
+
+那麼即使別台電腦成功打開 sample viewer 頁面，瀏覽器裡的 client 仍會去連：
+
+```text
+127.0.0.1:49100
+```
+
+也就是「別台電腦自己的 localhost」，而不是 `192.168.10.105:49100`。
+
+### 5. 正確理解應該是這樣
+
+本次架構可用以下文字理解：
+
+```text
+bim-streaming-server
+  = Kit 原生 viewer + WebRTC stream server
+  -> 對外提供 49100 等 streaming 端點
+
+web-viewer-sample
+  = browser viewer client sample
+  -> 透過 5173 提供前端頁面
+  -> 頁面載入後再去連 49100
+```
+
+換句話說：
+
+- `bim-streaming-server` 有自己的 viewer，但那是 server 端原生視窗
+- `bim-streaming-server` 沒有內建獨立的 web viewer 頁面
+- `web-viewer-sample` 是「連線觀看用的前端範例」
+- 若要跨機觀看，重點不是只有 `5173` 可不可達，還要確認 sample viewer 最後實際連到的是不是正確的 server IP
