@@ -66,3 +66,5 @@ deps/**/user.toml
 /current-stream-*.png
 /stream-validation-*.png
 /docs/gitnexus-agent-guide.md
+/.codex
+/.codex
