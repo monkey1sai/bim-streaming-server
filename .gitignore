@@ -3,6 +3,8 @@ _*/
 
 # Compiled python files.
 *.py[cod]
+*.pyc
+__pycache__/
 
 # Visual Studio files.
 /.vs
@@ -37,5 +39,15 @@ deps/**/user.toml
 # Streaming EventTrace
 *.etli
 
-/source
+# Keep generated template metadata out of version control, but track app/extension sources.
+/source/*
+!/source/apps/
+!/source/apps/**
+!/source/extensions/
+!/source/extensions/**
+/source/**/__pycache__/
+/source/**/__pycache__/**
+/source/**/*.pyc
+/source/rendered_template_metadata.json
+
 .gitnexus
