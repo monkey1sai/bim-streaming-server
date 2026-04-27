@@ -2,573 +2,386 @@
 
 日期：2026-04-27
 
-## Issue 摘要
+## 結論
 
-`ezplus.bim_review_stream_streaming.kit` 在 `client -> WebRTC -> server` 流程中，瀏覽器端會出現 `Stream disconnected from server, FrameGrabFailed.`，導致 `localhost:5173` 雖然能連到 `127.0.0.1:49100`，但畫面無法穩定顯示。
+這次 `FrameGrabFailed` / 黑畫面問題的主因是 WebRTC 串流解析度協商不一致，不是 stage 空白、port 錯誤，或搬移 repo 後 source 仍指向舊路徑。
 
-這次的最終根因不是 stage 是否為空，也不是 signaling port 設錯，而是 `client` 和 windowed `Kit` server 在串流建立時使用了不同的解析度協商值；而且這個高度不是固定常數，會隨 Windows 實際可用視窗區域而漂移。
+正式解法：
 
-## 影響範圍
+- server 使用 NVIDIA kit-app-template 官方建議的 headless streaming 啟動方式：`--no-window`
+- client 不要寫死 `height: 1062` / `1009` / `1008`
+- 以 server / WebRTC handshake 回傳的實際 stream size 為準
+- 不要再用 windowed server 的視窗高度 workaround 當正式方案
 
-- `server` repo：`bim-streaming-server`
-- `client` repo：`C:\Repos\active\iot\web-viewer-sample`
-- 受影響流程：
-  - `ezplus.bim_review_stream_streaming.kit`
-  - `web-viewer-sample` local mode
-  - `localhost:5173` -> `ws://127.0.0.1:49100/sign_in`
-
-## 現象
-
-### 瀏覽器端
-
-- local client 可成功載入 `http://localhost:5173`
-- 可成功連到 `127.0.0.1:49100`
-- 曾經可看到 `video` element 存在，但最終會出現：
+最新驗證結果：
 
 ```text
-Stream disconnected from server, FrameGrabFailed.
+server repo: C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server
+client repo: C:\Repos\active\iot\AI-BIM-governance\web-viewer-sample
+server: _build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --no-window
+client: npm run dev -- --host 127.0.0.1
+browser: http://127.0.0.1:5173/
 ```
 
-或在後續測試中出現：
+成功證據：
 
 ```text
-Streaming stopped as NoVideoPacketsReceivedEver.
+Started primary stream server on signal port 49100 and stream port 47998
+app ready
+Client connected to WebRTC server
 ```
 
-### Server 端
-
-`server` 在有視窗模式下，會重複輸出：
-
-```text
-Cannot stream video frame with resolution `1920x1062` that differs from that of 1920x1080 established when the client connected to the stream.
-```
-
-在更差的情況下，還會進一步出現：
-
-```text
-Device lost
-Failed to begin render graph. Device lost detected while waiting for frame submission semaphore.
-A GPU crash occurred. Exiting the application...
-```
-
-## 與空 template 的關係
-
-這次要區分兩件事：
-
-1. `content.emptyStageOnStart = true`
-   - 這會造成 `UI for any streaming app` 進來後看到黑畫面。
-   - 這只能解釋「空 stage」，不能解釋 `FrameGrabFailed`。
-2. `FrameGrabFailed`
-   - 這次真正的 root cause 是解析度協商不一致。
-   - 就算 client 已經成功送出 `openStageRequest`，只要解析度 mismatch 還在，畫面仍可能失敗或直接把 renderer 打到 `Device lost`。
-
-## Root Cause
-
-### 1. Server 實際 stream content area 不是固定值
-
-第一次成功建立 session 後，client 從 stream metadata 拿到：
+Browser 端曾量測到：
 
 ```json
-"streamInfo":[{"width":1920,"height":1062,"fps":60}]
+{
+  "readyState": 4,
+  "videoWidth": 1920,
+  "videoHeight": 1080,
+  "currentTime": "0.224821 -> 3.229019",
+  "paused": false
+}
 ```
 
-但在後續重新驗證時，server 端又出現：
+2026-04-27 16:47 再次驗證：重新關閉 client/server 後重啟，browser 顯示 NVIDIA Web Viewer 3D demo scene，可看到球、方塊、圓錐畫面。
 
-```text
-Cannot stream video frame with resolution `1920x1009` that differs from that of 1920x1062 established when the client connected to the stream.
-```
+## 正確啟動方式
 
-再往下追，重新協商後甚至會變成：
+### Server
 
-```text
-Cannot stream video frame with resolution `1920x1009` that differs from that of 1920x1008 established when the client connected to the stream.
-```
-
-這代表 windowed `Kit` server 在這台 Windows 主機上的實際可串流內容區高度會變動，不是永遠固定在 `1062`。
-
-### 2. Client 初始連線若硬編碼固定高度，遲早會再失配
-
-`web-viewer-sample/src/AppStream.tsx` 的 local mode 連線設定原本是：
-
-```ts
-width: 1920,
-height: 1080,
-fps: 60,
-```
-
-因此 WebRTC 連線建立時，client 先用 `1920x1080` 協商；但 server 真正送出來的是 `1920x1062`，導致 server 側一直丟出 resolution mismatch warning。
-
-把 client 改成 `1062` 只能修掉當下那一輪，但只要 host 視窗內容區再變，例如這次後續又漂到 `1009`，client 就會再次失配。
-
-### 3. 這次還有一個容易忽略的奇偶數問題
-
-後續驗證時，server log 顯示：
-
-```text
-Processing static resize of video stream with expected extents 1920x1079 that are invalid so they have been adjusted to 1920x1078
-```
-
-這表示 stream SDK / encoder 對高度有額外限制：
-
-- Height 必須是偶數
-
-因此若實際內容區高度落在奇數，例如 `1009`，就很容易出現：
-
-- client 看到或協商到 `1008`
-- server 實際又在送 `1009`
-- 最後形成 `1009` vs `1008` 的 1-pixel mismatch
-
-### 4. Mismatch 會連帶觸發 frame grab / renderer 異常
-
-這個 mismatch 並不只是 warning：
-
-- 輕則 client 沒收到有效影格，最後變成 `NoVideoPacketsReceivedEver`
-- 重則 server 側 RTX renderer 進入 `Device lost / GPU crash`
-
-也就是說，`FrameGrabFailed` 在這次案例裡是「解析度協商不一致」的外顯結果，而不是第一層根因。
-
-## 解法
-
-這次要分成兩層解法：
-
-1. 不要再假設 windowed server 的內容區高度是固定常數
-2. 啟動 server 時，盡量把主視窗高度控制到能落在合法偶數內容區
-
-本次實際可重現的 workaround 是：
-
-- 啟動 windowed server 時，明確傳入：
+官方基準流程：
 
 ```powershell
-.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --/app/window/height=1079 --/app/window/width=1920
+cd C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server
+.\repo.bat launch -- --no-window
 ```
 
-server 會把 `1079` 自動調整成可編碼的 `1078`，而最後 client 實測拿到穩定的：
+選單中選：
 
 ```text
-1920x1008
+ezplus.bim_review_stream_streaming.kit
 ```
 
-搭配 local client 目前的協商高度調整，可讓串流恢復正常。
+本 repo 便利指令：
 
-檔案：
+```powershell
+cd C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
+```
+
+或直接跑 build 產物：
+
+```powershell
+cd C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server
+.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --no-window
+```
+
+Server log 預期：
 
 ```text
-C:\Repos\active\iot\web-viewer-sample\src\AppStream.tsx
+Started primary stream server on signal port 49100 and stream port 47998
+app ready
 ```
 
-調整前：
-
-```ts
-width: 1920,
-height: 1080,
-fps: 60,
-```
-
-第一次調整後：
-
-```ts
-width: 1920,
-height: 1062,
-fps: 60,
-```
-
-後續再次驗證後，因 host 視窗內容區已漂移，不再適合把 `1062` 視為永久答案。當前這台機器重新驗證可用的 local 協商值已改為：
-
-```ts
-width: 1920,
-height: 1009,
-fps: 60,
-```
-
-注意：這個值仍屬 host-specific workaround，並不代表所有時間點或所有機器都固定是 `1009`。
-
-## 驗證流程
-
-### 1. 啟動 server
-
-使用 windowed 模式啟動。若要降低奇數高度造成的 mismatch，優先使用：
+### Client
 
 ```powershell
-.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --/app/window/height=1079 --/app/window/width=1920
-```
-
-驗證點：
-
-- `kit.exe` 存活
-- `49100` 由新的 `kit.exe` listen
-- `app ready` 出現在 server log
-
-### 2. 啟動 client
-
-在 `web-viewer-sample` repo 執行：
-
-```powershell
-npm run dev
+cd C:\Repos\active\iot\AI-BIM-governance\web-viewer-sample
+npm run dev -- --host 127.0.0.1
 ```
 
 開啟：
 
 ```text
-http://localhost:5173
+http://127.0.0.1:5173/
 ```
 
-UI 選擇：
+使用預設：
 
-- `UI for default streaming USD Viewer app`
+```text
+UI for default streaming USD Viewer app
+```
 
-### 3. 成功條件
+按 `Next` 後，server log 應出現：
 
-瀏覽器端驗證：
+```text
+Client connected to WebRTC server
+```
 
-- `video.readyState = 4`
-- `video.videoWidth = 1920`
-- `video.videoHeight` 與 server 最終穩定輸出的偶數高度一致
-- `currentTime` 持續增加
-- 沒有再出現：
-  - `FrameGrabFailed`
-  - `NoVideoPacketsReceivedEver`
+詳細日常測試 checklist 請看：
 
-Server 端驗證：
+```text
+C:\Repos\active\iot\AI-BIM-governance\連線測試.md
+```
 
-- 不再出現：
+## Root Cause
+
+### 1. Windowed server 的實際串流高度會漂移
+
+曾觀察到 server / client 協商或實際輸出高度出現：
+
+```text
+1920x1080
+1920x1062
+1920x1009
+1920x1008
+```
+
+windowed Kit server 的內容區高度會受 Windows working area、工作列、DPI、視窗 chrome、focus 狀態影響。這導致 `.kit` 裡設定 `1920x1080`，但實際 stream content area 不一定是 `1920x1080`。
+
+### 2. Client 寫死解析度會導致 mismatch
+
+`web-viewer-sample/src/AppStream.tsx` local mode 曾經寫死：
+
+```ts
+width: 1920,
+height: 1080,
+fps: 60,
+```
+
+當 server 實際送出 `1920x1062` 或其他高度時，server 端會出現：
 
 ```text
 Cannot stream video frame with resolution `1920x1062` that differs from that of 1920x1080 established when the client connected to the stream.
 ```
 
-### 4. 本次實測結果
+把 client 改成 `1062` 或 `1009` 只能修當下環境，不能作為永久解。
 
-第一次修正後，曾確認：
+### 3. 奇數高度會放大 1-pixel mismatch
 
-- WebRTC session 可建立
-- `video.readyState = 4`
-- `video.videoWidth = 1920`
-- `video.videoHeight = 1062`
-- `currentTime` 持續前進
-- sample scene 可正常顯示
+曾觀察到：
 
-但後續重跑同流程後，發現 `1062` 並不是固定值。當 Windows 實際工作區改變時，windowed server 的內容區會漂到 `1009`，進一步造成 `1009` vs `1008` 的 mismatch。
+```text
+Processing static resize of video stream with expected extents 1920x1079 that are invalid so they have been adjusted to 1920x1078
+```
 
-在重新以 `--/app/window/height=1079 --/app/window/width=1920` 啟動 server，並重新驗證後，已再次確認：
+stream SDK / encoder 對高度有偶數限制。若實際高度落在 `1009`，就可能形成 `1009` vs `1008` 的 1-pixel mismatch，最後導致 frame grab / no video packet 問題。
 
-- WebRTC session 可建立
-- `video.readyState = 4`
-- `video.videoWidth = 1920`
-- `video.videoHeight = 1008`
-- `currentTime` 持續前進
-- sample scene 可正常顯示
+## 正式解法
 
-因此目前判定：
-
-- `FrameGrabFailed` 的根因仍是解析度協商不一致
-- 而更精確地說，是 windowed server 的內容區高度會漂移，且奇數高度會再放大 mismatch 風險
-
-## 操作注意事項
-
-### 1. 這個解法針對 windowed server 路徑
-
-本次驗證成功條件建立在 windowed `Kit` server。若改用 `--no-window`，行為可能不同，需獨立驗證。
-
-### 2. `UI for any streaming app` 仍可能只看到空畫面
-
-若 app 本身沒有主動送 stage loading 流程，`UI for any streaming app` 不會替你送 `openStageRequest`。這是空 stage 問題，不是 `FrameGrabFailed` 問題。
-
-### 3. 解析度不能只看 `.kit` 設定值
-
-即使：
-
-- `renderer.resolution.width = 1920`
-- `renderer.resolution.height = 1080`
-- `window.width = 1920`
-- `window.height = 1080`
-
-實際 stream content area 仍可能因 OS window chrome、工作列、host working area 或視窗狀態變成 `1920x1062`、`1920x1009` 或其他值。排查時應以實際 `streamInfo` 與 `video.videoWidth/video.videoHeight` 為準，不要只看 kit config。
-
-### 4. Windows working area 會直接影響這個問題
-
-本次後續驗證時，主螢幕資訊為：
-
-- Screen bounds: `1920x1080`
-- Working area: `1920x1032`
-
-這表示工作列等系統 UI 已吃掉一部分高度。當 server 用 windowed 模式跑滿螢幕可用區時，實際內容區高度就可能繼續被壓縮，進而讓串流內容高度落在非預期值。
-
-### 5. 奇數高度是高風險訊號
-
-若 server log 出現像 `1920x1009` 這種奇數高度，應優先懷疑：
-
-- encoder / stream SDK 會把它修正成相鄰偶數
-- client / server 兩側看到的高度可能差 1 pixel
-- 這會直接導致「有連上但沒有畫面」
-
-## 後續建議
-
-1. 若希望避免之後再被 host 視窗尺寸影響，應優先實作：
-   - client 端依 `streamInfo` 自動調整或二次 `resize`
-   - 或啟用/評估 `dynamicResize`
-2. 在沒有動態調整前，不要把 `1062`、`1009`、`1008` 當成永久常數；每次 host 環境不同都可能變。
-3. 若要用 windowed 模式做現場排障，建議優先把 server 啟成容易落在偶數內容區的高度，例如：
-   - `--/app/window/height=1079 --/app/window/width=1920`
-4. 若之後要恢復 `1920x1080` 協商，需先確認 server 實際能穩定輸出 `1920x1080`，否則同樣會重現 mismatch。
-5. 若再次看到 `Device lost`，先確認前面是否先出現 resolution mismatch，不要直接把問題歸到 GPU driver。
-
-## 正解：以 headless 模式啟動，不寫死像素
-
-> 上方 root cause 與「workaround」是排查歷程；正式落地的解法應採用 NVIDIA `omni.usd_viewer` 模板 README 明示的 headless 啟動方式，**不再寫死視窗高度**。
-
-### 為什麼 `--no-window` 是正解
-
-- 模板 README 原文：「Launching the streaming application with `--no-window` passes an argument directly to Kit allowing it to run without the main application window to prevent conflicts with the streaming client.」
-- headless 模式下 Kit **不再經過 OS window manager 取「可用工作區」**，所以實際 render 解析度不會被工作列、DPI、視窗 chrome、focus 狀態影響
-- encoder 拿到的就是 `.kit` 內 `renderer.resolution.width/height = 1920 / 1080`，恆為穩定偶數
-- 從架構上消除「windowed server 內容區漂到奇數高度」這個 root cause，而不是繞過
-
-### Server 端啟動方式（建議）
+使用 headless streaming：
 
 ```powershell
 .\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
 ```
 
-或直接執行 build 產物：
+原因：
 
-```powershell
-.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --no-window
-```
+- NVIDIA kit-app-template streaming 文件建議使用 `--no-window`
+- headless 模式不經過 OS window manager 的可用工作區計算
+- 避免視窗高度、工作列、DPI、window chrome 影響 stream content area
+- 從架構上消除 windowed content area 漂移
 
-`.kit` 設定不需要改：
-- `source/apps/ezplus.bim_review_stream.kit`：`renderer.resolution.width/height = 1920 / 1080`、`livestream.allowResize = 1`、`livestream.skipCapture = 1`、`viewport.fillViewport = true`
-- `source/apps/ezplus.bim_review_stream_streaming.kit`：與 NVIDIA 範本 `templates/apps/streaming_configs/default_stream.kit` 一致
+不應再採用：
 
-### Client 端對稱修正（不在本 repo）
+- `--/app/window/height=1079 --/app/window/width=1920`
+- client 寫死 `height: 1062`
+- client 寫死 `height: 1009`
+- client 寫死 `height: 1008`
 
-`web-viewer-sample/src/AppStream.tsx` 不要再寫死 `height: 1009` / `1062`。應改成：
+這些都是排查期間 workaround，不是產品解法。
+
+## Client 修正原則
+
+Client 應接受 server / WebRTC handshake 的實際解析度，不要把某次實測高度當常數。
+
+建議方向：
 
 1. WebRTC handshake 後讀 server 回傳的 `streamInfo.width/height`
-2. 用該值設 `<video>` 與內部協商；後續若要 resize，透過 `livestream.allowResize` 重新協商
-3. 視需要評估 / 啟用 `dynamicResize`
+2. 用實際值更新 video / internal stream state
+3. 若要 resize，透過 `livestream.allowResize` 重新協商
+4. 視需要評估 `dynamicResize`
 
-### 前置條件：Windows `Hardware-accelerated GPU scheduling` 必須關閉
+## 搬移路徑後排查
 
-若 `--no-window` 啟動時重現 `Failed to start the primary stream server` / `NVST_R_INTERNAL_ERROR` / `Device lost`，先處理這個系統設定，**不要回頭去 windowed + 寫死像素**：
-
-- registry 路徑：`HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\HwSchMode`
-- 值改為 `1`（Off）後重開機
-- 這是 NVIDIA 官方文件已知會讓 Omniverse WebRTC streaming freeze 的設定，與本 repo 的 `todo-webrtc-server-reboot-checklist-2026-04-24.md` 盤查結論一致
-
-### 反模式（不應再採用）
-
-- ❌ `--/app/window/height=1079 --/app/window/width=1920`：高度會隨 Windows working area 漂移，不是常數
-- ❌ Client 寫死 `height: 1062` / `1009` / `1008`：每次 host 環境變動就破功
-- ❌ 同時兩邊寫死：雙重耦合，任一邊漂移就重現 `FrameGrabFailed`
-
----
-
-## `--no-window` 解法的端到端實測（2026-04-27）
-
-本機已實際以 `--no-window` 跑過完整端到端 WebRTC 串流並驗證通過。
-
-### 環境
-
-- Server：`bim-streaming-server`，build at `_build/windows-x86_64/release/`
-- Client：`web-viewer-sample`（Vite 5.4，`stream.config.json` source=`local`、server=`127.0.0.1`、signalingPort=`49100`）
-- GPU：NVIDIA GeForce RTX 4060 Ti，driver 580.97，D3D12
-- OS：Windows 11 Pro 24H2 (build 26100)
-- HwSchMode：`1`（Off）— NVIDIA 已知會讓 Omniverse WebRTC freeze 的設定已先關閉
-
-### Server 啟動
-
-```powershell
-.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
-```
-
-server log 關鍵訊息：
+原路徑：
 
 ```text
-[2.774s] [Info] [omni.kit.livestream.app.plugin] Started primary stream server on signal port 49100 and stream port 47998
-[5.919s] app ready
+C:\Repos\active\iot\bim-streaming-server
 ```
 
-整段 streaming 期間 server log 完全沒有出現以下故障 pattern：
-
-- `Cannot stream video frame with resolution X that differs from Y`
-- `FrameGrabFailed`
-- `NoVideoPacketsReceivedEver`
-- `Device lost`
-- `NVST_R_INTERNAL_ERROR`
-- `Failed to start the primary stream server`
-
-### Client 啟動
-
-```powershell
-cd C:\Repos\active\iot\web-viewer-sample
-npm run dev
-```
-
-打開 `http://localhost:5173`，維持預設 `UI for default streaming USD Viewer app`，按 Next。
-
-### 量測值（兩次獨立 sample）
-
-| 指標 | Sample 1 | Sample 2 |
-| --- | --- | --- |
-| `video.readyState` | 4 | 4 |
-| `video.videoWidth` | 1920 | 1920 |
-| `video.videoHeight` | 1008 | 1008 |
-| `video.currentTime` 推進 | 27.0 → 46.3 | 16.7 → 37.5 |
-| video / audio track | live | live |
-| `corruptedVideoFrames` | 0 | 0 |
-| `droppedVideoFrames` | — | 173 / 2190（首次連線 buffering） |
-| Console errors（連線後） | 0 | 0 |
-
-### 結論
-
-- `--no-window` 模式下，encoder 落在穩定的 `1920x1008`，全程不漂移
-- 不需要任何 `--/app/window/height=...` 寫死像素覆寫
-- Client 不需要、也不應該寫死任何高度 — `omni.kit.livestream.webrtc` 會透過 `streamInfo` 完成解析度協商
-- 之前 windowed 模式下會出現的所有 mismatch / `FrameGrabFailed` / `Device lost` 全部消失
-
-> 留意：`videoHeight` 落在 `1008` 而非 `.kit` 設定的 `1080`，是 Kit / streaming layer 在 headless 路徑的內部選擇，但**它在不同次 launch 之間穩定**，與 client 透過 `streamInfo` 自動取得，所以不再產生兩端不一致的問題。
-
-## 附錄：歷史 workaround（僅在 `--no-window` 不可用時臨時使用）
-
-以下是這次在本機曾經實際重做、可暫時恢復 `client -> WebRTC -> server` 的啟動方式。**正式落地請改用上方 headless 解法**；本節保留歷程紀錄。
-
-### 1. Server 啟動方式
-
-請使用 windowed server，並明確指定目前較穩定的視窗大小：
-
-```powershell
-.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --/app/window/height=1079 --/app/window/width=1920
-```
-
-等價的 build 後直接啟動指令：
-
-```powershell
-.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --/app/window/height=1079 --/app/window/width=1920
-```
-
-這樣做的目的：
-
-- 避免 server 視窗內容區落在不穩定的奇數高度
-- 讓 stream SDK 最後較穩定地落到 `1920x1008`
-- 降低 `FrameGrabFailed` 與 `NoVideoPacketsReceivedEver` 重現機率
-
-### 2. Client 啟動方式（本機驗證）
-
-在 `web-viewer-sample` repo：
-
-```powershell
-npm run dev
-```
-
-然後開啟：
+新路徑：
 
 ```text
-http://localhost:5173
+C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server
 ```
 
-使用既有 client 頁面流程即可，不需要另外修改 UI 邏輯：
+搬移後不能 work 時，照以下順序查：
 
-- 保持預設的 `UI for default streaming USD Viewer app`
-- 按 `Next`
-- 讓 client 依照既有 local mode 對 `127.0.0.1:49100` 建立連線
+### 1. 搜尋舊絕對路徑
 
-### 3. 修復後預期行為
+```powershell
+rg -n --hidden --glob '!**/.git/**' --glob '!**/extscache/**' "C:\\Repos\\active\\iot\\bim-streaming-server|C:/Repos/active/iot/bim-streaming-server" .
+```
 
-當上述 server / client 都以這個方式啟動時，本機應看到：
+本次驗證未找到 source 或目前 generated config 仍引用舊路徑。
 
-- `kit.exe` 存活
-- `49100` 為 `LISTENING`
-- `localhost:5173` 可正常載入
-- browser client 會在按下 `Next` 後對 `127.0.0.1:49100` 建立連線
-- `netstat` 可觀察到多組 `127.0.0.1:49100 ESTABLISHED`
+### 2. 重新 build
 
-### 4. 若又重新看不到畫面，優先檢查這三件事
+```powershell
+.\repo.bat build -x
+```
 
-1. `server` 是否仍是用 `1079 x 1920` 的方式啟動
-2. `client` 是否已在首頁維持預設 `UI for default streaming USD Viewer app` 並按下 `Next`
-3. `client` local mode 是否仍維持 issue 中已驗證可用的協商高度
-
-若上述任一項被改回舊狀態，就可能再次出現：
-
-- `Got stop event while waiting for client connection`
-- `NoVideoPacketsReceivedEver`
-- 或解析度 mismatch 造成的黑畫面
-
-## 架構角色說明
-
-這次排查中，最容易混淆的是 `bim-streaming-server`、`49100`、`web-viewer-sample` 與 `5173` 分別代表什麼。
-
-### 1. `bim-streaming-server` 是 Kit app + WebRTC stream server
-
-`bim-streaming-server` 這個 repo 產出的 `ezplus.bim_review_stream_streaming.kit`，同時扮演兩個角色：
-
-- `Kit viewer`：
-  - 本機會開出 Omniverse / Kit 原生視窗
-  - 視窗裡的主要內容是 `Viewport`
-  - 這就是 server 端實際 render 的畫面來源
-- `WebRTC stream server`：
-  - 將上面的 viewport 畫面編碼後對外提供 WebRTC signaling / media
-  - 本次主要驗證的 signaling 入口是 `49100`
-
-也就是說，`bim-streaming-server` 自己有 viewer，但那個 viewer 是 `Kit 原生視窗`，不是獨立的瀏覽器頁面。
-
-### 2. `web-viewer-sample` 是 browser viewer client 範例
-
-`web-viewer-sample` 不是 stream server，本質上是：
-
-- 一個示範如何在瀏覽器中嵌入 NVIDIA WebRTC streaming library 的 sample client
-- 一個示範如何建立 WebRTC 連線、接收畫面、送控制訊息的範例 viewer
-
-它的 `5173` 只是 Vite dev server 提供出來的前端頁面埠，作用是：
-
-- 把 sample viewer 網頁送到瀏覽器
-- 讓瀏覽器中的 JavaScript 再去連真正的 stream server
-
-所以：
-
-- `5173` 不是 WebRTC stream server
-- `49100` 才是這次主要的 WebRTC signaling / streaming 入口
-
-### 3. 別台電腦若無法開 `192.168.10.105:5173`，不代表 stream server 沒開
-
-本次另行確認到：
-
-- `49100` 是綁在 `0.0.0.0:49100`
-- 代表 `Kit` 這一側的 stream server 允許其他 IP 嘗試連入
-
-但 `web-viewer-sample` 的 Vite dev server 若只綁 `localhost` 或 `::1`，那別台電腦打：
+成功條件：
 
 ```text
-http://192.168.10.105:5173
+BUILD (RELEASE) SUCCEEDED
 ```
 
-仍然會失敗。這代表：
+本次實測：
 
-- 失敗的是 sample viewer 頁面沒有對外提供
-- 不代表 `49100` 那個 WebRTC server 本身一定沒對外開
+```text
+BUILD (RELEASE) SUCCEEDED (Took 21.68 seconds)
+```
 
-### 4. `web-viewer-sample` 預設 local mode 也可能把連線指到錯的主機
+### 3. 用互動桌面 session 啟動
 
-若 `web-viewer-sample` 的 `stream.config.json` 仍是：
+Omniverse streaming 需要 GPU / D3D12 / NVML 正常初始化。若從 sandbox、service、非互動 task 或權限受限 runner 啟動，可能看到：
+
+```text
+OSError: [WinError 10106] 無法載入或初始化所要求的服務提供者。
+Failed to initialize NVML: Unknown Error
+D3D12CreateDevice failed
+Failed to create any GPU devices
+```
+
+這類錯誤代表啟動 session 不可靠，不等於 repo 搬移後壞掉。
+
+### 4. 確認 client 指向正確 server
+
+`web-viewer-sample/stream.config.json` local mode 應指向實際 server：
 
 ```json
-"local": {
-  "server": "127.0.0.1",
-  "signalingPort": 49100
+{
+  "source": "local",
+  "local": {
+    "server": "127.0.0.1",
+    "signalingPort": 49100,
+    "mediaPort": null
+  }
 }
 ```
 
-那麼即使別台電腦成功打開 sample viewer 頁面，瀏覽器裡的 client 仍會去連：
+同機測試用 `127.0.0.1`。跨機測試時必須改成 server 主機 IP，不能維持 `127.0.0.1`。
+
+## 不乾淨關閉現象
+
+若 browser client 還在或仍嘗試 signaling 時直接關 server，Kit log 可能出現：
 
 ```text
-127.0.0.1:49100
+Failed to setup the streaming session because: StreamSdkException 800b0000 [NVST_R_GENERIC_ERROR] Got stop event while waiting for client connection.
 ```
 
-也就是「別台電腦自己的 localhost」，而不是 `192.168.10.105:49100`。
+若 server 還活著，可能持續看到：
 
-### 5. 正確理解應該是這樣
+```text
+Processing 13 signaling headers
+Got stop event while waiting for client connection
+```
 
-本次架構可用以下文字理解：
+判斷：
+
+- 這代表 WebRTC session setup 被 shutdown / stop event 打斷
+- 它是 session 狀態不乾淨的證據
+- 不一定代表 process 或 port 沒釋放
+- 但會讓後續排查 log 變髒
+
+本輪曾確認到一個殘留案例：
+
+```text
+kit.exe PID 15576
+Path: C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server\_build\windows-x86_64\release\kit\kit.exe
+```
+
+使用者在 server terminal 回答：
+
+```text
+Terminate batch job (Y/N)? Y
+```
+
+再次檢查：
+
+```powershell
+Get-Process -Id 15576 -ErrorAction SilentlyContinue
+```
+
+沒有輸出，表示該次殘留 process 已結束。
+
+## 正確關閉順序
+
+建議順序：
+
+1. 關 browser viewer tab
+2. 停 client Vite：`Ctrl+C`
+3. 停 server：`Ctrl+C`
+4. 若出現 `Terminate batch job (Y/N)?`，輸入 `Y`
+5. 確認 port / process 釋放
+
+檢查：
+
+```powershell
+Get-Process kit -ErrorAction SilentlyContinue
+netstat -ano | Select-String ':49100|:47998|:5173'
+```
+
+若 server terminal 已關閉但 `kit.exe` 還在，先確認 PID path：
+
+```powershell
+Get-Process kit -ErrorAction SilentlyContinue | Select-Object Id,Path,StartTime
+```
+
+必要時精準停止：
+
+```powershell
+Stop-Process -Id <PID>
+```
+
+仍不退出才使用：
+
+```powershell
+Stop-Process -Id <PID> -Force
+```
+
+不要直接：
+
+```powershell
+Stop-Process -Name kit -Force
+```
+
+避免誤殺其他 Omniverse / Kit app。
+
+## 常見故障對照
+
+| 現象 | 判斷 | 處理 |
+| --- | --- | --- |
+| `FrameGrabFailed` | 多半是解析度協商不一致的外顯結果 | 用 `--no-window`，不要寫死高度 |
+| `NoVideoPacketsReceivedEver` | client 沒收到有效 video packet | 查 server 是否有 resolution mismatch |
+| `Cannot stream video frame with resolution X that differs from Y` | server/client 協商高度不同 | 移除硬編碼高度，改 headless |
+| `Got stop event while waiting for client connection` | client/session 還在 setup 時 server 被停止或 session 被打斷 | 先關 client，再重啟 server/client |
+| `Device lost` | 可能是 mismatch 後連帶 renderer 異常 | 先查前面是否已有 resolution mismatch |
+| `Failed to start the primary stream server` / `NVST_R_INTERNAL_ERROR` | 可能是 Windows GPU scheduling 或 session 問題 | 檢查 HwSchMode、互動桌面 session |
+
+## Windows GPU Scheduling 前置條件
+
+若 `--no-window` 啟動時重現：
+
+```text
+Failed to start the primary stream server
+NVST_R_INTERNAL_ERROR
+Device lost
+```
+
+先檢查 Windows `Hardware-accelerated GPU scheduling`。
+
+已知設定：
+
+```text
+HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\HwSchMode = 1
+```
+
+`1` 代表 Off。修改後需重開機。
+
+## 架構角色
 
 ```text
 bim-streaming-server
@@ -581,9 +394,37 @@ web-viewer-sample
   -> 頁面載入後再去連 49100
 ```
 
-換句話說：
+重點：
 
-- `bim-streaming-server` 有自己的 viewer，但那是 server 端原生視窗
-- `bim-streaming-server` 沒有內建獨立的 web viewer 頁面
-- `web-viewer-sample` 是「連線觀看用的前端範例」
-- 若要跨機觀看，重點不是只有 `5173` 可不可達，還要確認 sample viewer 最後實際連到的是不是正確的 server IP
+- `5173` 是 Vite dev server，不是 WebRTC stream server
+- `49100` 是 WebRTC signaling 入口
+- `47998` 是 stream media port
+- 跨機觀看時，`web-viewer-sample` 頁面可打開還不夠，`stream.config.json` 也要指向 server 主機 IP
+
+## Codex / 自動化測試注意事項
+
+以下屬於 Codex / sandbox / Windows automation 限制，不應誤判為 server repo 壞掉：
+
+- Codex shell 內直接 `Start-Process` Kit 或 npm，曾失敗於「目錄名稱無效」或「找不到指定的模組」
+- 當前 shell 沒有 `ScheduledTasks` PowerShell cmdlet，需改用 `schtasks.exe`
+- `schtasks.exe /TR` 直接包 `powershell -Command "Set-Location ...; npm run dev"` 時，引號容易被 Task Scheduler 解析壞
+- Chrome `--remote-debugging-port` 在既有 Chrome instance/profile 下可能不產生 `DevToolsActivePort`
+- Codex shell 內 `curl` / `netstat` 對 localhost port 的結果曾與桌面實際狀態不一致
+
+自動化驗證應以以下證據為準：
+
+- Kit log：`Started primary stream server...`
+- Kit log：`Client connected to WebRTC server`
+- Vite log：`Local: http://127.0.0.1:5173/`
+- browser 實際畫面：NVIDIA Web Viewer 3D scene
+
+## 官方參考
+
+- NVIDIA-Omniverse/kit-app-template：`repo.bat` / `repo.sh` 是 repo tool 入口
+  - https://github.com/NVIDIA-Omniverse/kit-app-template
+- kit-app-template README：build 使用 `.\repo.bat build`，launch 使用 `.\repo.bat launch`
+  - https://github.com/NVIDIA-Omniverse/kit-app-template
+- Application Streaming：build 後用 `.\repo.bat launch -- --no-window` 啟動 streaming app，另一個 terminal 啟動 `web-viewer-sample`
+  - https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/streaming.html
+- kit-app-template Tooling Guide：`--` 後面的參數會直接傳給 Kit executable
+  - https://github.com/NVIDIA-Omniverse/kit-app-template/blob/main/readme-assets/additional-docs/kit_app_template_tooling_guide.md

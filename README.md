@@ -106,42 +106,54 @@ cd bim-streaming-server
 .\repo.bat build -x
 ```
 
-### 4. 啟動 app
+成功時應看到類似：
 
-一般互動啟動：
-
-```powershell
-.\repo.bat launch
+```text
+BUILD (RELEASE) SUCCEEDED (Took XX.XX seconds)
 ```
 
-直接指定目前 streaming app：
+### 4. 啟動 app / streaming server
+
+NVIDIA `kit-app-template` 官方流程是先 build，再用 `repo.bat launch` 啟動；若要把參數傳給 Kit executable，放在 `--` 後面。Streaming app 建議用 `--no-window`，避免本機視窗大小與瀏覽器串流互相干擾。
+
+官方基準流程：
 
 ```powershell
-.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit
+.\repo.bat launch -- --no-window
 ```
 
-### 5. 目前建議的 server 啟動指令
+當 launch 選單出現時，選：
 
-依官方 `omni.usd_viewer` 模板的建議，streaming layer 應以 **headless 模式**啟動，讓 Kit 直接以 `.kit` 內 `renderer.resolution` 設定的解析度 render，不再受 OS window chrome / 工作列影響：
+```text
+ezplus.bim_review_stream_streaming.kit
+```
+
+本專案也可直接指定目前 streaming app：
 
 ```powershell
 .\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
 ```
 
+若已 build 完成，也可直接執行 build 產物：
+
+```powershell
+.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --no-window
+```
+
 這樣做：
 
-- encoder 永遠拿到 `.kit` 設定的 `1920x1080`（穩定的偶數）
 - 不會出現「windowed 模式下實際內容區漂到 `1062` / `1009`」造成 `FrameGrabFailed` 的根因
-- Client 端應改為從 WebRTC `streamInfo` 動態取得協商解析度，**不要寫死 `width` / `height`**
+- Client 端應從 WebRTC `streamInfo` 動態取得協商解析度，**不要寫死 `width` / `height`**
+- 2026-04-27 在本 repo 新路徑 `C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server` 重新 build 後，已實測 `video.readyState=4`、`videoWidth=1920`、`videoHeight=1080`、`currentTime` 持續推進
 
 如果 `--no-window` 重現 `Failed to start the primary stream server`，先檢查 Windows `Hardware-accelerated GPU scheduling` 是否關閉（NVIDIA 文件已知此設定下 Omniverse WebRTC 會 freeze），不要回頭去 windowed + 寫死像素。
 
-### 6. 對應 client 啟動步驟
+### 5. 對應 client 啟動步驟
 
 server 啟動後，搭配 `web-viewer-sample` 做端到端測試：
 
 ```powershell
-cd C:\Repos\active\iot\web-viewer-sample
+cd C:\Repos\active\iot\AI-BIM-governance\web-viewer-sample
 npm run dev
 ```
 
@@ -156,7 +168,7 @@ npm run dev
 
 開啟 `http://localhost:5173`，維持「UI for default streaming USD Viewer app」並按 Next。
 
-預期：`video.readyState=4`、`videoWidth=1920`、`videoHeight=1008`（穩定，不會漂）、`currentTime` 持續推進、Console 無 `FrameGrabFailed` / `NoVideoPacketsReceivedEver`。
+預期：`video.readyState=4`、`videoWidth>0`、`videoHeight>0`、`currentTime` 持續推進、Console 無 `FrameGrabFailed` / `NoVideoPacketsReceivedEver`。本機 2026-04-27 重新驗證值為 `1920x1080`。
 
 > client 端**不要**寫死 `width` / `height`；`omni.kit.livestream.webrtc` 會透過 `streamInfo` 自動完成解析度協商。
 
@@ -196,8 +208,9 @@ web-viewer-sample
 
 ## 官方文件
 
-- [Kit App Template Companion Tutorial](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/intro.html)
+- [NVIDIA-Omniverse/kit-app-template](https://github.com/NVIDIA-Omniverse/kit-app-template)
 - [Application Streaming](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/streaming.html)
+- [kit-app-template Tooling Guide](https://github.com/NVIDIA-Omniverse/kit-app-template/blob/main/readme-assets/additional-docs/kit_app_template_tooling_guide.md)
 - [Kit Kernel Command Line Options](https://docs.omniverse.nvidia.com/kit/docs/carbonite/latest/docs/Kernel/CommandLineOptions.html)
 - [Kit Manual: Configuration](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/105.1/guide/configuring.html)
 
