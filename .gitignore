@@ -38,6 +38,7 @@ deps/**/user.toml
 
 # Streaming EventTrace
 *.etli
+*.etl
 
 # Keep generated template metadata out of version control, but track app/extension sources.
 /source/*
@@ -51,3 +52,10 @@ deps/**/user.toml
 /source/rendered_template_metadata.json
 
 .gitnexus
+
+# Local agent / browser automation artifacts
+/.claude/
+/.playwright-mcp/
+/AGENTS.md
+/CLAUDE.md
+/current-stream-*.png
