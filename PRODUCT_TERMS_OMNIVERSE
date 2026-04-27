@@ -1,84 +1,123 @@
-PRODUCT-SPECIFIC TERMS FOR NVIDIA OMNIVERSE DISCLAIMER
+NVIDIA Omniverse 產品特定條款說明（中文摘要）
 
-This document is a reference copy of the Product-Specific Terms for NVIDIA Omniverse. Please note that this copy may not be the most up-to-date version.
+重要聲明：
 
-The then-current version of the Product-Specific Terms for NVIDIA Omniverse can always be found at: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/
+- 本文件是中文說明摘要，方便開發與內部閱讀。
+- 它不是法律翻譯，也不取代 NVIDIA 官方授權文件。
+- 若本文件與 NVIDIA 官方最新授權條款有任何差異，應一律以官方最新版本為準。
 
-Any discrepancies between this document and the then-current license agreement should be resolved in favor of the then-current license agreement.
+官方授權與產品條款：
 
+- NVIDIA Software License Agreement
+  https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/
+- Omniverse Product-Specific Terms
+  以上述官方頁面為準
 
-These Product Specific Terms for NVIDIA Omniverse (“Omniverse Product-Specific Terms”) are an exhibit to the NVIDIA Software License Agreement at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/ (the “Agreement”) and are incorporated as an integral part of the Agreement.
+## 適用範圍
 
-Scope. The Agreement and these Omniverse Product-Specific Terms govern the use of NVIDIA Omniverse including:
+本條款適用於 NVIDIA Omniverse 的使用，包括但不限於：
 
-1.1 Enterprise Products, versions of the Kit SDK, Nucleus Enterprise, and Omniverse Cloud Containers, as updated from time to time,
+- Enterprise Products
+- Kit SDK 各版本
+- Nucleus Enterprise
+- Omniverse Cloud Containers
+- 公開提供的 Free SDKs
+- OpenUSD Exchange SDK 的公開支援版本
 
-1.2 Free SDKs, all publicly available versions of the Software, with the exception of the Software listed above as an Enterprise Product, as updated from time to time, and
+## 關鍵名詞
 
-1.3 Supported SDKs, the publicly available versions of OpenUSD Exchange SDK.
+- `Kit SDK`：
+  NVIDIA 用於開發應用程式、microservices、plugins 的工具組與 extension 集合。
+- `Nucleus`：
+  Omniverse 的資料庫與協作服務。
+- `Omniverse Cloud Containers`：
+  可透過 Omniverse API 存取，並可部署在 Kubernetes 的 Omniverse 軟體容器。
 
-1.4 For the purposes of the Agreement:
+## 授權重點摘要
 
-1.4.1 “Kit SDK” means an NVIDIA toolkit for Omniverse including extensions for the development of applications, microservices or plugins.
+在符合授權條款、訂單、產品授權參數與費用要求的前提下，NVIDIA 會授予有限、全球、非專屬、不可轉讓、不可再授權（除非條款明示允許）的授權，允許：
 
-1.4.2 “Nucleus” means an NVIDIA application that enables a database and collaboration service for Omniverse.
+- 安裝、使用、重製、建立衍生樣例（Derivative Samples）
+- 在自有或租用基礎設施上，以服務形式提供相容應用中的 Software 與衍生樣例
+- 在相容應用中散布 Software 與衍生樣例
 
-1.4.3 “Omniverse Cloud Containers” means Omniverse software containers accessible via Omniverse APIs and deployable on Kubernetes in which Omniverse software is packaged, along with its libraries and dependencies, including NVIDIA’s Omniverse inference microservices containers, such as USD Code and USD Search.
+## 限制與注意事項
 
-Grant. Section 1.1 of the Agreement is amended and restated to read as follows:
+### 1. Developer Program / NFR / Trial 版本限制
 
-1.1 Subject to the terms of the Agreement, Customer’s Order Form and license parameters of an Enterprise Product Part Number, and payment of applicable fees, NVIDIA grants Customer a limited, worldwide, non-exclusive, non-transferable, non-sublicensable (except as expressly provided in the Agreement) license to do the following for the duration of the license:
+- `NFR` 或 `not for resale` 版本通常僅供內部評估或展示
+- Trial 版本只能在試用期間內使用
+- 經由 NVIDIA Developer Program 取得的 Omniverse 軟體，通常僅供：
+  - 內部評估
+  - 開發
+  - 測試
+- 此類軟體通常不得直接用於 production 使用、散布或正式部署
 
-1.1.1 install, use, reproduce, create Derivative Samples, and configure (if applicable) the Software,
+### 2. 對外提供服務或散布時的額外要求
 
-1.1.2 offer as a service the Software and Derivative Samples in Compatible Applications on infrastructure Customer owns or leases, and
+若你將 Software 或 Derivative Samples：
 
-1.1.3 sublicense and distribute the Software and Derivative Samples in Compatible Applications.
+- 對外提供為服務
+- 或重新散布給第三方
 
-Limited Grant. Section 1.2 of the Agreement is amended and restated to read as follows:
+則需要額外遵守：
 
-1.2 Limited Grants. The grants above are further limited as follows:
+- 你的應用或服務必須具有「實質額外功能」，不能只是包一層 NVIDIA Software
+- 若發現不合規使用，需通知 NVIDIA
+- Derivative Samples 需包含指定聲明：
+  - `This software contains source code provided by NVIDIA Corporation.`
+- 你與客戶或使用者的條款，至少要與 NVIDIA 原條款同等保護
+- NVIDIA 可要求提供使用報告，以確認費用與授權範圍
 
-1.2.1 Users that receive an Enterprise Product identified as “not for resale” or “NFR” (typically a license to a distributor or reseller) may exercise only the grant in Section 1.1.1 above solely for internal evaluation or to demonstrate the Enterprise Product to others. Software offered as part of the developer program is not for use, distribution or deployment in production.
+### 3. Enterprise Support
 
-1.2.2 Users that receive an Enterprise Product for trial may exercise the grants in Section 1.1 solely for the trial period.
+- Enterprise Support 只提供給授權客戶本人
+- 不自動延伸到客戶的最終使用者或其他第三方
 
-1.2.3 Users that receive an Enterprise Product via the NVIDIA developer program for Omniverse products have a personal use license to exercise only the grant in Section 1.1.1 above for Software that is part of this program (as updated by NVIDIA from time to time) solely for internal evaluation, development or test purposes. Software offered as part of the developer program is not for use, distribution or deployment in production. NVIDIA will admit persons into the developer program for Omniverse products, as well as change or discontinue the program and its offerings, at NVIDIA’s sole discretion.
+### 4. 平台限制
 
-License Types. Section 1.4 (“License Types”) of the Agreement is amended to add the following:
+部分專有元件只能在 NVIDIA 平台上執行，包括：
 
-NVIDIA may offer and sell, with different prices and terms, Subscriptions for use of Enterprise Products in a designated platform. For example, NVIDIA may indicate that use of the Software within the NVIDIA Graphics Delivery Network (GDN) is subject to payment of GDN use fees and Customer is exempt from payment of fees for use of the Enterprise Product under this Agreement. If you obtained a Subscription at a different price solely for use in a particular platform (such as GDN) and you use in other platforms, NVIDIA or a reseller may invoice you to pay a higher value Enterprise Product Subscription.
+- Kit SDK
+- Omniverse Cloud Containers
 
-A new subsection 1.7 is added to the Agreement as follows:
+## 原始碼索取
 
-1.7 Requirements. The requirements in this section apply to Software and Derivative Samples that Customer deploys as a service and for Customer to exercise the distribution grants:
+若某些第三方元件的授權（例如 GPL / LGPL）要求提供可再散布的原始碼，可聯絡：
 
-1.7.1 Additional Functionality. A Compatible Application or Customer service that Customer provides to third parties must have material additional functionality beyond the included portions of Software.
+- `oss-requests@nvidia.com`
 
-1.7.2 Notification of Misuse. Customer agrees to notify NVIDIA in writing of any known or suspected use or distribution of Software and Derivative Samples not in compliance with the terms and conditions the Agreement, and to enforce the terms of Customer’s agreements with respect to Software.
+根據文件，此提供有效期為 NVIDIA 產品散布日起三年內。
 
-1.7.3 NVIDIA Works Notice. The following notice must be included in Derivative Samples: “This software contains source code provided by NVIDIA Corporation.”
+## 資料蒐集
 
-1.7.4 Customer Agreements. The terms under which Customer deploys as a service or distributes the Software and Derivative Samples must be at least as protective as the terms of the Agreement (including, but not limited to, terms relating to the grant, restrictions and protection of Intellectual Property Rights).
+官方條款指出，軟體可能蒐集下列資訊以改善產品：
 
-1.7.5 Use Report. Customer must report upon NVIDIA’s email request, no more than monthly, the Software in use by all users Customer enabled, quantity, start and end dates, and any other reasonably requested information for NVIDIA to determine the fees due.
+- 系統配置
+- 作業系統與安裝資訊
+- 功能使用情形
+- 效能與診斷紀錄
 
-1.7.6 Enterprise Support. Subject to the terms of the Agreement, NVIDIA will provide Enterprise Support to Customer for the duration indicated in the Part Number, and Enterprise Support does not extend to any other parties.
+官方也指出，在某些情況下，為交付軟體或服務，可能需要姓名、Email、授權資訊等個資。
 
-1.7.7 License Administration. Customer will be responsible for the administration of licenses and services to Customer’s users during their use period.
+是否可關閉資料蒐集，會依授權型態而不同：
 
-A new subsection 6.3 is added to the Agreement as follows:
+- 非 Subscription License：可依官方說明選擇 opt-out
+- Subscription License：預設通常不蒐集，必要時可 opt-in
 
-6.3 Source Code Offer. To obtain source code for software provided under licenses that require redistribution of source code, including the GNU General Public License (GPL) and GNU Lesser General Public License (LGPL), contact oss-requests@nvidia.com. This offer is valid for a period of three (3) years from the date of the distribution of the product by NVIDIA CORPORATION.
+資料主體權利與隱私處理，請以 NVIDIA 官方隱私與授權頁面為準。
 
-Section 11.1 of the Agreement is amended and restated to read as follows:
+## 建議做法
 
-11.1 Collection Purposes. Customer hereby acknowledges that the Software collects the following data for the following purposes: (i) configuration, operating system and installation data to optimize for better performance; (ii) feature usage data to improve stability and understand user workflow; and (iii) performance logs for diagnostic and troubleshooting purposes. Further, NVIDIA may require certain personal information such as name, email address, and entitlement information to deliver or provide the Software or Services to Customer and its authorized users.
+如果這個 repo 或由此產生的應用有以下用途：
 
-If Customer is using Software without purchasing a Subscription License, Customer can opt-out of data collection by visiting https://docs.omniverse.nvidia.com/usd/latest/common/data-collection.html, and Customer can exercise the data subject rights by visiting Privacy Center | NVIDIA. If Customer is using the Software under a Subscription License, there is no data collection by default and Customer can opt-into data collection by visiting. Subscription License users can exercise data subject rights by submitting a request in Enterprise Support portal.
+- 對外散布
+- 提供 SaaS / streaming service
+- 商業部署
+- 客戶交付
 
-Limitation. A new subsection 8.16 is added to the “Limitations” section of the Agreement as follows:
+建議務必在法務與授權確認後再進行，並以 NVIDIA 官方最新授權條款為準，不要只依賴本摘要。
 
-8.16 The following proprietary Software components are licensed only to run on systems with NVIDIA Platforms: Kit SDK and Omniverse Cloud Containers.
+版本參考：
 
-(v. January 30, 2025)
+- 原始文件標示版本：`January 30, 2025`
