@@ -40,6 +40,11 @@ deps/**/user.toml
 *.etli
 *.etl
 
+# Stray dir created when %SystemDrive% env var failed to expand under bash/MSYS
+# (Kit / NvStreamer subprocess wrote to "%SystemDrive%\ProgramData\..." literally
+# while cwd was the repo root). Local artifact only — never enter version control.
+/%SystemDrive%/
+
 # Keep generated template metadata out of version control, but track app/extension sources.
 /source/*
 !/source/apps/
@@ -59,3 +64,5 @@ deps/**/user.toml
 /AGENTS.md
 /CLAUDE.md
 /current-stream-*.png
+/stream-validation-*.png
+/docs/gitnexus-agent-guide.md

@@ -312,6 +312,188 @@ Cannot stream video frame with resolution `1920x1062` that differs from that of 
 4. 若之後要恢復 `1920x1080` 協商，需先確認 server 實際能穩定輸出 `1920x1080`，否則同樣會重現 mismatch。
 5. 若再次看到 `Device lost`，先確認前面是否先出現 resolution mismatch，不要直接把問題歸到 GPU driver。
 
+## 正解：以 headless 模式啟動，不寫死像素
+
+> 上方 root cause 與「workaround」是排查歷程；正式落地的解法應採用 NVIDIA `omni.usd_viewer` 模板 README 明示的 headless 啟動方式，**不再寫死視窗高度**。
+
+### 為什麼 `--no-window` 是正解
+
+- 模板 README 原文：「Launching the streaming application with `--no-window` passes an argument directly to Kit allowing it to run without the main application window to prevent conflicts with the streaming client.」
+- headless 模式下 Kit **不再經過 OS window manager 取「可用工作區」**，所以實際 render 解析度不會被工作列、DPI、視窗 chrome、focus 狀態影響
+- encoder 拿到的就是 `.kit` 內 `renderer.resolution.width/height = 1920 / 1080`，恆為穩定偶數
+- 從架構上消除「windowed server 內容區漂到奇數高度」這個 root cause，而不是繞過
+
+### Server 端啟動方式（建議）
+
+```powershell
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
+```
+
+或直接執行 build 產物：
+
+```powershell
+.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --no-window
+```
+
+`.kit` 設定不需要改：
+- `source/apps/ezplus.bim_review_stream.kit`：`renderer.resolution.width/height = 1920 / 1080`、`livestream.allowResize = 1`、`livestream.skipCapture = 1`、`viewport.fillViewport = true`
+- `source/apps/ezplus.bim_review_stream_streaming.kit`：與 NVIDIA 範本 `templates/apps/streaming_configs/default_stream.kit` 一致
+
+### Client 端對稱修正（不在本 repo）
+
+`web-viewer-sample/src/AppStream.tsx` 不要再寫死 `height: 1009` / `1062`。應改成：
+
+1. WebRTC handshake 後讀 server 回傳的 `streamInfo.width/height`
+2. 用該值設 `<video>` 與內部協商；後續若要 resize，透過 `livestream.allowResize` 重新協商
+3. 視需要評估 / 啟用 `dynamicResize`
+
+### 前置條件：Windows `Hardware-accelerated GPU scheduling` 必須關閉
+
+若 `--no-window` 啟動時重現 `Failed to start the primary stream server` / `NVST_R_INTERNAL_ERROR` / `Device lost`，先處理這個系統設定，**不要回頭去 windowed + 寫死像素**：
+
+- registry 路徑：`HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\HwSchMode`
+- 值改為 `1`（Off）後重開機
+- 這是 NVIDIA 官方文件已知會讓 Omniverse WebRTC streaming freeze 的設定，與本 repo 的 `todo-webrtc-server-reboot-checklist-2026-04-24.md` 盤查結論一致
+
+### 反模式（不應再採用）
+
+- ❌ `--/app/window/height=1079 --/app/window/width=1920`：高度會隨 Windows working area 漂移，不是常數
+- ❌ Client 寫死 `height: 1062` / `1009` / `1008`：每次 host 環境變動就破功
+- ❌ 同時兩邊寫死：雙重耦合，任一邊漂移就重現 `FrameGrabFailed`
+
+---
+
+## `--no-window` 解法的端到端實測（2026-04-27）
+
+本機已實際以 `--no-window` 跑過完整端到端 WebRTC 串流並驗證通過。
+
+### 環境
+
+- Server：`bim-streaming-server`，build at `_build/windows-x86_64/release/`
+- Client：`web-viewer-sample`（Vite 5.4，`stream.config.json` source=`local`、server=`127.0.0.1`、signalingPort=`49100`）
+- GPU：NVIDIA GeForce RTX 4060 Ti，driver 580.97，D3D12
+- OS：Windows 11 Pro 24H2 (build 26100)
+- HwSchMode：`1`（Off）— NVIDIA 已知會讓 Omniverse WebRTC freeze 的設定已先關閉
+
+### Server 啟動
+
+```powershell
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
+```
+
+server log 關鍵訊息：
+
+```text
+[2.774s] [Info] [omni.kit.livestream.app.plugin] Started primary stream server on signal port 49100 and stream port 47998
+[5.919s] app ready
+```
+
+整段 streaming 期間 server log 完全沒有出現以下故障 pattern：
+
+- `Cannot stream video frame with resolution X that differs from Y`
+- `FrameGrabFailed`
+- `NoVideoPacketsReceivedEver`
+- `Device lost`
+- `NVST_R_INTERNAL_ERROR`
+- `Failed to start the primary stream server`
+
+### Client 啟動
+
+```powershell
+cd C:\Repos\active\iot\web-viewer-sample
+npm run dev
+```
+
+打開 `http://localhost:5173`，維持預設 `UI for default streaming USD Viewer app`，按 Next。
+
+### 量測值（兩次獨立 sample）
+
+| 指標 | Sample 1 | Sample 2 |
+| --- | --- | --- |
+| `video.readyState` | 4 | 4 |
+| `video.videoWidth` | 1920 | 1920 |
+| `video.videoHeight` | 1008 | 1008 |
+| `video.currentTime` 推進 | 27.0 → 46.3 | 16.7 → 37.5 |
+| video / audio track | live | live |
+| `corruptedVideoFrames` | 0 | 0 |
+| `droppedVideoFrames` | — | 173 / 2190（首次連線 buffering） |
+| Console errors（連線後） | 0 | 0 |
+
+### 結論
+
+- `--no-window` 模式下，encoder 落在穩定的 `1920x1008`，全程不漂移
+- 不需要任何 `--/app/window/height=...` 寫死像素覆寫
+- Client 不需要、也不應該寫死任何高度 — `omni.kit.livestream.webrtc` 會透過 `streamInfo` 完成解析度協商
+- 之前 windowed 模式下會出現的所有 mismatch / `FrameGrabFailed` / `Device lost` 全部消失
+
+> 留意：`videoHeight` 落在 `1008` 而非 `.kit` 設定的 `1080`，是 Kit / streaming layer 在 headless 路徑的內部選擇，但**它在不同次 launch 之間穩定**，與 client 透過 `streamInfo` 自動取得，所以不再產生兩端不一致的問題。
+
+## 附錄：歷史 workaround（僅在 `--no-window` 不可用時臨時使用）
+
+以下是這次在本機曾經實際重做、可暫時恢復 `client -> WebRTC -> server` 的啟動方式。**正式落地請改用上方 headless 解法**；本節保留歷程紀錄。
+
+### 1. Server 啟動方式
+
+請使用 windowed server，並明確指定目前較穩定的視窗大小：
+
+```powershell
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --/app/window/height=1079 --/app/window/width=1920
+```
+
+等價的 build 後直接啟動指令：
+
+```powershell
+.\_build\windows-x86_64\release\ezplus.bim_review_stream_streaming.kit.bat --/app/window/height=1079 --/app/window/width=1920
+```
+
+這樣做的目的：
+
+- 避免 server 視窗內容區落在不穩定的奇數高度
+- 讓 stream SDK 最後較穩定地落到 `1920x1008`
+- 降低 `FrameGrabFailed` 與 `NoVideoPacketsReceivedEver` 重現機率
+
+### 2. Client 啟動方式（本機驗證）
+
+在 `web-viewer-sample` repo：
+
+```powershell
+npm run dev
+```
+
+然後開啟：
+
+```text
+http://localhost:5173
+```
+
+使用既有 client 頁面流程即可，不需要另外修改 UI 邏輯：
+
+- 保持預設的 `UI for default streaming USD Viewer app`
+- 按 `Next`
+- 讓 client 依照既有 local mode 對 `127.0.0.1:49100` 建立連線
+
+### 3. 修復後預期行為
+
+當上述 server / client 都以這個方式啟動時，本機應看到：
+
+- `kit.exe` 存活
+- `49100` 為 `LISTENING`
+- `localhost:5173` 可正常載入
+- browser client 會在按下 `Next` 後對 `127.0.0.1:49100` 建立連線
+- `netstat` 可觀察到多組 `127.0.0.1:49100 ESTABLISHED`
+
+### 4. 若又重新看不到畫面，優先檢查這三件事
+
+1. `server` 是否仍是用 `1079 x 1920` 的方式啟動
+2. `client` 是否已在首頁維持預設 `UI for default streaming USD Viewer app` 並按下 `Next`
+3. `client` local mode 是否仍維持 issue 中已驗證可用的協商高度
+
+若上述任一項被改回舊狀態，就可能再次出現：
+
+- `Got stop event while waiting for client connection`
+- `NoVideoPacketsReceivedEver`
+- 或解析度 mismatch 造成的黑畫面
+
 ## 架構角色說明
 
 這次排查中，最容易混淆的是 `bim-streaming-server`、`49100`、`web-viewer-sample` 與 `5173` 分別代表什麼。

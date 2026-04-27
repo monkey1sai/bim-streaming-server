@@ -1,306 +1,211 @@
-# Omniverse Kit App Template
+# BIM Streaming Server
 
 <p align="center">
-  <img src="readme-assets/kit_app_template_banner.png" width=100% />
+  <img src="readme-assets/kit_app_template_banner.png" width="100%" />
 </p>
 
-## :memo: Feature Branch Information
-**This repository is based on a Feature Branch of the Omniverse Kit SDK.** Feature Branches are regularly updated and best suited for testing and prototyping.
-For stable, production-oriented development, please use the [Production Branch of the Kit SDK on NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/omniverse/collections/omniverse_enterprise_25h1).
+## 專案說明
 
-[Omniverse Release Information](https://docs.omniverse.nvidia.com/dev-overview/latest/omniverse-releases.html#)
+這個 repo 以 NVIDIA `kit-app-template` 為基底，整理出目前用於 `BIM Review Stream` 的 Omniverse Kit 應用與串流設定。它同時包含：
 
+- `Kit` 原生應用本體
+- `WebRTC` 串流用的 streaming app layer
+- `source/apps` 與 `source/extensions` 內的專案原始碼
+- `repo.bat` / `repo.sh` 所使用的 build、launch、package tooling
 
-## Overview
+目前主要 app：
 
-Welcome to `kit-app-template`, a toolkit designed for developers interested in GPU-accelerated application development within the NVIDIA Omniverse ecosystem. This repository offers streamlined tools and templates to simplify creating high-performance, OpenUSD-based desktop or cloud streaming applications using the Omniverse Kit SDK.
+- `source/apps/ezplus.bim_review_stream.kit`
+- `source/apps/ezplus.bim_review_stream_streaming.kit`
 
-### About Omniverse Kit SDK
+目前主要 extension：
 
-The Omniverse Kit SDK enables developers to build immersive 3D applications. Key features include:
-- **Language Support:** Develop with either Python or C++, offering flexibility for various developer preferences.
-- **OpenUSD Foundation:** Utilize the robust Open Universal Scene Description (OpenUSD) for creating, manipulating, and rendering rich 3D content.
-- **GPU Acceleration:** Leverage GPU-accelerated capabilities for high-fidelity visualization and simulation.
-- **Extensibility:** Create specialized extensions that provide dynamic user interfaces, integrate with various systems, and offer direct control over OpenUSD data, making the Omniverse Kit SDK versatile for numerous applications.
+- `source/extensions/ezplus.bim_review_stream.setup`
+- `source/extensions/ezplus.bim_review_stream.messaging`
 
-### Applications and Use Cases
+## 重要定位
 
-The `kit-app-template` repository enables developers to create cross-platform applications (Windows and Linux) optimized for desktop use and cloud streaming. Potential use cases include designing and simulating expansive virtual environments, producing high-quality synthetic data for AI training, and building advanced tools for technical analysis and insights. Whether you're crafting engaging virtual worlds, developing comprehensive analysis tools, or creating simulations, this repository, along with the Kit SDK, provides the foundational components required to begin development.
+這個 repo 產生的是：
 
-### A Deeper Understanding
+- `Kit viewer`：本機 Omniverse / Kit 原生視窗
+- `WebRTC stream server`：把 viewport 畫面串流出去
 
-The `kit-app-template` repository is designed to abstract complexity, jumpstarting your development with pre-configured templates, tools, and essential boilerplate. For those seeking a deeper understanding of the application and extension creation process, we have provided the following resources:
+它不是內建 browser viewer。若要用瀏覽器觀看，通常會搭配另一個 web client，例如 `web-viewer-sample`。
 
-#### Companion Tutorial
+## 環境需求
 
-**[Explore the Kit SDK Companion Tutorial](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/intro.html)**: This tutorial offers detailed insights into the underlying structure and mechanisms, providing a thorough grasp of both the Kit SDK and the development process.
+- 作業系統：Windows 10/11 或 Linux（Ubuntu 22.04+）
+- GPU：NVIDIA RTX 顯示卡
+- Driver：
+  - Linux `>= 550.54.15`
+  - Windows `>= 551.78`
+- 網路：首次抓取 Kit SDK、extension 與工具時需要可連外
 
-### New Developers
+### 建議安裝
 
-For a beginner-friendly introduction to application development using the Omniverse Kit SDK, see the NVIDIA DLI course:
+- [Git](https://git-scm.com/downloads)
+- [Git LFS](https://git-lfs.com/)
+- Windows 若有 C++ 編譯需求：
+  - Visual Studio 2019/2022
+  - Desktop development with C++
+  - Windows SDK
 
-#### Beginner Tutorial
+## 目錄說明
 
-**[Developing an Omniverse Kit-Based Application](https://learn.nvidia.com/courses/course-detail?course_id=course-v1:DLI+S-OV-11+V1)**: This course offers an accessible introduction to application development (account and login required).
+| 路徑 | 用途 |
+| --- | --- |
+| `source/apps/` | App `.kit` 定義 |
+| `source/extensions/` | 專案 extension 原始碼 |
+| `docs/` | 專案文件與 issue wiki |
+| `templates/` | kit-app-template 內建模板 |
+| `tools/` | repo tool 與相依設定 |
+| `premake5.lua` | 定義要 build 的 app |
+| `repo.toml` | repo tool 主設定 |
+| `repo.bat` / `repo.sh` | Windows / Linux 入口 |
 
-These resources empower developers at all experience levels to fully utilize the `kit-app-template` repository and the Omniverse Kit SDK.
+### 不建議納入版控的本機產物
 
-## Table of Contents
-- [Overview](#overview)
-- [Prerequisites and Environment Setup](#prerequisites-and-environment-setup)
-- [Repository Structure](#repository-structure)
-- [Quick Start](#quick-start)
-- [Templates](#templates)
-    - [Applications](#applications)
-    - [Extensions](#extensions)
-- [Tools](#tools)
-- [License](#license)
-- [Additional Resources](#additional-resources)
-- [Contributing](#contributing)
+以下目錄或檔案預設應視為本機產物：
 
-## Prerequisites and Environment Setup
+- `_build/`
+- `_compiler/`
+- `_repo/`
+- `_debug/`
+- `.claude/`
+- `.playwright-mcp/`
+- `*.etl`
 
-Ensure your system is set up with the following to work with Omniverse Applications and Extensions:
+## 快速開始
 
-- **Operating System**: Windows 10/11 or Linux (Ubuntu 22.04 or newer)
+### 1. Clone
 
-- **GPU**: NVIDIA RTX capable GPU (RTX 3070 or Better recommended)
-
-- **Driver**: Minimum and recommended - This update requires driver version >=550.54.15 (Linux) or >=551.78 (Windows). Please verify your driver versions before upgrading. Newer versions may work but are not equally validated.
-
-- **Internet Access**: Required for downloading the Omniverse Kit SDK, extensions, and tools.
-
-### Required Software Dependencies
-
-- [**Git**](https://git-scm.com/downloads): For version control and repository management
-
-- [**Git LFS**](https://git-lfs.com/): For managing large files within the repository
-
-- **(Windows - C++ Only) Microsoft Visual Studio (2019 or 2022)**: You can install the latest version from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/). Ensure that the **Desktop development with C++** workload is selected.  [Additional information on Windows development configuration](readme-assets/additional-docs/windows_developer_configuration.md)
-
-- **(Windows - C++ Only) Windows SDK**: Install this alongside MSVC. You can find it as part of the Visual Studio Installer. [Additional information on Windows development configuration](readme-assets/additional-docs/windows_developer_configuration.md)
-
-- **(Linux) build-essentials**: A package that includes `make` and other essential tools for building applications.  For Ubuntu, install with `sudo apt-get install build-essential`
-
-### Recommended Software
-
-- [**(Linux) Docker**](https://docs.docker.com/engine/install/ubuntu/): For containerized development and deployment. **Ensure non-root users have Docker permissions.**
-
-- [**(Linux) NVIDIA Container Toolkit**](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html): For GPU-accelerated containerized development and deployment. **Installation and Configuring Docker steps are required.**
-
-- [**VSCode**](https://code.visualstudio.com/download) (or your preferred IDE): For code editing and development
-
-
-## Repository Structure
-
-| Directory Item   | Purpose                                                    |
-|------------------|------------------------------------------------------------|
-| .vscode          | VS Code configuration details and helper tasks             |
-| readme-assets/   | Images and additional repository documentation             |
-| templates/       | Template Applications and Extensions.                      |
-| tools/           | Tooling settings and repository specific (local) tools     |
-| .editorconfig    | [EditorConfig](https://editorconfig.org/) file.            |
-| .gitattributes   | Git configuration.                                         |
-| .gitignore       | Git configuration.                                         |
-| LICENSE          | License for the repo.                                      |
-| README.md        | Project information.                                       |
-| premake5.lua     | Build configuration - such as what apps to build.          |
-| repo.bat         | Windows repo tool entry point.                             |
-| repo.sh          | Linux repo tool entry point.                               |
-| repo.toml        | Top level configuration of repo tools.                     |
-| repo_tools.toml  | Setup of local, repository specific tools                  |
-
-## Quick Start
-
-This section guides you through creating your first Kit SDK-based Application using the `kit-app-template` repository. For a more comprehensive explanation of functionality previewed here, reference the following [Tutorial](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/intro.html) for an in-depth exploration.
-
-### 1. Clone the Repository
-
-Begin by cloning the `kit-app-template` to your local workspace:
-
-#### 1a. Clone
-
-```bash
-git clone https://github.com/NVIDIA-Omniverse/kit-app-template.git
+```powershell
+git clone https://github.com/monkey1sai/bim-streaming-server.git
+cd bim-streaming-server
 ```
 
-#### 1b. Navigate to Cloned Directory
+### 2. 建立或更新 source
 
-```bash
-cd kit-app-template
-```
+如果你要從模板建立新的 app / extension，可用：
 
-### 2. Create and Configure New Application From Template
-
-Run the following command to initiate the configuration wizard:
-
-**Linux:**
-```bash
-./repo.sh template new
-```
-
-**Windows:**
 ```powershell
 .\repo.bat template new
 ```
 
-> **NOTE:** If this is your first time running the `template new` tool, you'll be prompted to accept the Omniverse Licensing Terms.
-
-Follow the prompt instructions:
-- **? Select what you want to create with arrow keys ↑↓:** Application
-- **? Select desired template with arrow keys ↑↓:** Kit Base Editor
-- **? Enter name of application .kit file [name-spaced, lowercase, alphanumeric]:** [set application name]
-- **? Enter application_display_name:** [set application display name]
-- **? Enter version:** [set application version]
-
-  Application [application name] created successfully in [path to project]/source/apps/[application name]
-
-- **? Do you want to add application layers?** No
-
-#### Explanation of Example Selections
-
-• **`.kit` file name:** This file defines the application according to Kit SDK guidelines. The file name should be lowercase and alphanumeric to remain compatible with Kit’s conventions.
-
-• **display name:** This is the application name users will see. It can be any descriptive text.
-
-• **version:** The version number of the application. While you can use any format, semantic versioning (e.g., 0.1.0) is recommended for clarity and consistency.
-
-• **application layers:** These optional layers add functionality for features such as streaming to web browsers. For this quick-start, we skip adding layers, but choosing “yes” would let you enable and configure streaming capabilities.
+若只是使用目前 repo 已存在的 `source/apps` 與 `source/extensions`，可直接進行 build。
 
 ### 3. Build
 
-Build your new application with the following command:
-
-
-**Linux:**
-```bash
-./repo.sh build
-```
-**Windows:**
 ```powershell
 .\repo.bat build
- ```
-
-A successful build will result in the following message:
-
-```text
-BUILD (RELEASE) SUCCEEDED (Took XX.XX seconds)
 ```
 
- If you experience issues related to build, please see the [Usage and Troubleshooting](readme-assets/additional-docs/usage_and_troubleshooting.md) section for additional information.
+若要強制重建：
 
-
-### 4. Launch
-
-Initiate your newly created application using:
-
-**Linux:**
-```bash
-./repo.sh launch
+```powershell
+.\repo.bat build -x
 ```
-**Windows:**
+
+### 4. 啟動 app
+
+一般互動啟動：
+
 ```powershell
 .\repo.bat launch
 ```
 
-**? Select with arrow keys which App would you like to launch:** [Select the created editor application]
+直接指定目前 streaming app：
 
-![Kit Base Editor Image](readme-assets/kit_base_editor.png)
+```powershell
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit
+```
 
+### 5. 目前建議的 server 啟動指令
 
-> **NOTE:** The initial startup may take 5 to 8 minutes as shaders compile for the first time. After initial shader compilation, startup time will reduce dramatically
+依官方 `omni.usd_viewer` 模板的建議，streaming layer 應以 **headless 模式**啟動，讓 Kit 直接以 `.kit` 內 `renderer.resolution` 設定的解析度 render，不再受 OS window chrome / 工作列影響：
 
-## Templates
+```powershell
+.\repo.bat launch -n ezplus.bim_review_stream_streaming.kit -- --no-window
+```
 
-`kit-app-template` features an array of configurable templates for `Extensions` and `Applications`, catering to a range of desired development starting points from minimal to feature rich.
+這樣做：
 
-### Applications
+- encoder 永遠拿到 `.kit` 設定的 `1920x1080`（穩定的偶數）
+- 不會出現「windowed 模式下實際內容區漂到 `1062` / `1009`」造成 `FrameGrabFailed` 的根因
+- Client 端應改為從 WebRTC `streamInfo` 動態取得協商解析度，**不要寫死 `width` / `height`**
 
-Begin constructing Omniverse Applications using these templates
+如果 `--no-window` 重現 `Failed to start the primary stream server`，先檢查 Windows `Hardware-accelerated GPU scheduling` 是否關閉（NVIDIA 文件已知此設定下 Omniverse WebRTC 會 freeze），不要回頭去 windowed + 寫死像素。
 
-- **[Kit Service](./templates/apps/kit_service)**: The minimal definition of an Omniverse Kit SDK based service. This template is useful for creating headless services leveraging Omniverse Kit functionality.
+### 6. 對應 client 啟動步驟
 
-- **[Kit Base Editor](./templates/apps/kit_base_editor/)**: A minimal template application for loading, manipulating and rendering OpenUSD content from a graphical interface.
+server 啟動後，搭配 `web-viewer-sample` 做端到端測試：
 
-- **[USD Composer](./templates/apps/usd_composer)**: A template application for authoring complex OpenUSD scenes, such as configurators.
+```powershell
+cd C:\Repos\active\iot\web-viewer-sample
+npm run dev
+```
 
-- **[USD Explorer](./templates/apps/usd_explorer)**: A template application for exploring and collaborating on large Open USD scenes.
+`stream.config.json` 維持預設 `local` / `127.0.0.1` / `49100`：
 
-- **[USD Viewer](./templates/apps/usd_viewer)**: A viewport-only template application that can be easily streamed and interacted with remotely, well-suited for streaming content to web pages.
+```json
+{
+  "source": "local",
+  "local": { "server": "127.0.0.1", "signalingPort": 49100, "mediaPort": null }
+}
+```
 
-### Extensions
+開啟 `http://localhost:5173`，維持「UI for default streaming USD Viewer app」並按 Next。
 
-Enhance Omniverse capabilities with extension templates:
+預期：`video.readyState=4`、`videoWidth=1920`、`videoHeight=1008`（穩定，不會漂）、`currentTime` 持續推進、Console 無 `FrameGrabFailed` / `NoVideoPacketsReceivedEver`。
 
-- **[Basic Python](./templates/extensions/basic_python)**: The minimal definition of an Omniverse Python Extension.
+> client 端**不要**寫死 `width` / `height`；`omni.kit.livestream.webrtc` 會透過 `streamInfo` 自動完成解析度協商。
 
-- **[Python UI](./templates/extensions/python_ui)**: An extension that provides an easily extendable Python-based user interface.
+詳細排查脈絡與實測量測值見 [docs/issue-webrtc-framegrabfailed-resolution-mismatch-2026-04-27.md](./docs/issue-webrtc-framegrabfailed-resolution-mismatch-2026-04-27.md)。
 
-- **[Basic C++](./templates/extensions/basic_cpp)**: The minimal definition of an Omniverse C++ Extension.
+更多 build / launch / source 產生步驟請見：
 
-- **[Basic C++ w/ Python Bindings](./templates/extensions/basic_python_binding)**: The minimal definition of an Omniverse C++ Extension that also exposes a Python interface via Pybind11.
+- [BUILD.md](./BUILD.md)
 
-   **Note for Windows C++ Developers** : This template requires `"platform:windows-x86_64".enabled` and `link_host_toolchain` within the `repo.toml` file be set to `true`. For additional C++ configuration information [see here](readme-assets/additional-docs/windows_developer_configuration.md).
+## Streaming 說明
 
+`bim-streaming-server` 的角色是：
 
-## Application Streaming
+- 本機開啟 `Kit` 原生 viewer
+- 將 viewer 畫面經由 `WebRTC` 對外串流
 
-The Omniverse Platform supports streaming Kit-based applications directly to a web browser. You can either manage your own deployment or use an NVIDIA-managed service:
+它常見會搭配另一個 web client，例如 `web-viewer-sample`：
 
-### Self-Managed
-- **Omniverse Kit App Streaming :** A reference implementation on GPU-enabled Kubernetes clusters for complete control over infrastructure and scalability.
+```text
+bim-streaming-server
+  = Kit viewer + WebRTC stream server
 
-### NVIDIA-Managed
-- **NVIDIA Cloud Functions (NVCF):** Offloads hardware, streaming, and network complexities for secure, large scale deployments.
+web-viewer-sample
+  = browser viewer client sample
+```
 
-[Configuring and packaging streaming-ready Kit applications](readme-assets/additional-docs/kit_app_streaming_config.md)
+因此：
 
-### Deploying to NVIDIA DGX Cloud (DGXC)
+- `49100` 是實際的 WebRTC signaling / streaming 入口
+- `5173` 若存在，通常只是 sample web viewer 的 dev server
 
-> ⚠️ **Planning to deploy on DGX Cloud?**
-> Applications deployed on NVIDIA DGX Cloud via NVCF need NVCF-compatible streaming configuration. The **NVCF Streaming** layer provides this out of the box, or you can create your own custom layer. Add layers during `template new` or later with `./repo.sh template modify` (Linux) or `.\repo.bat template modify` (Windows). Standard streaming configurations are not DGXC-compatible.
+## 重要文件
 
-See the [DGXC Deployment Guide](readme-assets/additional-docs/dgxc_nvcf_deployment.md) for configuration details and the [public DGXC documentation](https://docs.omniverse.nvidia.com/omniverse-dgxc/latest/) for deployment steps.
+- [BUILD.md](./BUILD.md)
+- [docs/issue-webrtc-framegrabfailed-resolution-mismatch-2026-04-27.md](./docs/issue-webrtc-framegrabfailed-resolution-mismatch-2026-04-27.md)
+- [docs/todo-webrtc-server-reboot-checklist-2026-04-24.md](./docs/todo-webrtc-server-reboot-checklist-2026-04-24.md)
 
+## 官方文件
 
-## Tools
+- [Kit App Template Companion Tutorial](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/intro.html)
+- [Application Streaming](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/streaming.html)
+- [Kit Kernel Command Line Options](https://docs.omniverse.nvidia.com/kit/docs/carbonite/latest/docs/Kernel/CommandLineOptions.html)
+- [Kit Manual: Configuration](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/105.1/guide/configuring.html)
 
-The Kit SDK includes a suite of tools to aid in the development, testing, and deployment of your projects. For a more detailed overview of available tooling, see the [Kit SDK Tooling Guide](readme-assets/additional-docs/kit_app_template_tooling_guide.md).
+## 授權與安全
 
-Here's a brief overview of some key tools:
+- 授權條款摘要：見 [PRODUCT_TERMS_OMNIVERSE](./PRODUCT_TERMS_OMNIVERSE)
+- 安全通報方式：見 [SECURITY.md](./SECURITY.md)
 
-- **Help (`./repo.sh -h` or `.\repo.bat -h`):** Provides a list of available tools and their descriptions.
+## 備註
 
-- **Template Creation (`./repo.sh template` or `.\repo.bat template`):** Assists in starting a new project by generating a scaffold from a template application or extension.
-
-- **Build (`./repo.sh build` or `.\repo.bat build`):** Compiles your applications and extensions, preparing them for launch.
-
-- **Launch (`./repo.sh launch`or`.\repo.bat launch`):** Starts your compiled application or extension.
-
-- **Testing (`./repo.sh test` or `.\repo.bat test`):** Facilitates the execution of test suites for your extensions, ensuring code quality and functionality.
-
-- **Packaging (`./repo.sh package` or `.\repo.bat package`):** Aids in packaging your application for distribution, making it easier to share or deploy in cloud environments.
-
-## Governing Terms
-The software and materials are governed by the [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) and the [Product-Specific Terms for NVIDIA Omniverse](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-omniverse/).
-
-## Data Collection
-The Omniverse Kit SDK collects anonymous usage data to help improve software performance and aid in diagnostic purposes. Rest assured, no personal information such as user email, name or any other field is collected.
-
-To learn more about what data is collected, how we use it and how you can change the data collection setting [see details page](readme-assets/additional-docs/data_collection_and_use.md).
-
-
-## Additional Resources
-
-- [Kit SDK Companion Tutorial](https://docs.omniverse.nvidia.com/kit/docs/kit-app-template/latest/docs/intro.html)
-
-- [Usage and Troubleshooting](readme-assets/additional-docs/usage_and_troubleshooting.md)
-
-- [Developer Bundle Extensions](readme-assets/additional-docs/developer_bundle_extensions.md)
-
-- [Omniverse Kit SDK Manual](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/latest/index.html)
-
-
-## Contributing
-
-We provide this source code as-is and are currently not accepting outside contributions.
+這個 repo 仍以 NVIDIA `kit-app-template` 生態為基底。若未來需要升級 Kit SDK 或調整 launch / package 流程，應優先以 NVIDIA 官方文件與當前 `repo.toml` 為準。
