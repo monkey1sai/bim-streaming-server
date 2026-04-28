@@ -11,7 +11,7 @@ import_configs = [
 ]
 
 # Repository Name
-name = "kit-app-template"
+name = "bim-streaming-server"
 
 # These are deprecation warnings with the upstreaming of KAT tooling.
 # Remove these warnings in May 2026.

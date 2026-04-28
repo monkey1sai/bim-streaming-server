@@ -18,3 +18,4 @@ repo_build.prebuild_copy {
 
 define_app("ezplus.bim_review_stream.kit")
 define_app("ezplus.bim_review_stream_streaming.kit")
+define_app("ezplus.bim_ifc_usd_converter.kit")
