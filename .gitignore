@@ -68,3 +68,24 @@ deps/**/user.toml
 /docs/gitnexus-agent-guide.md
 /.codex
 /.codex
+
+# BIM Streaming - USD model artifacts (per docs/plan-bim-ifc-usd-streaming-2026-04-27.md)
+/bim-models/*
+!/bim-models/.gitkeep
+!/bim-models/README.md
+*.usd
+*.usda
+*.usdc
+*.usdz
+!/source/apps/**/*.usd
+!/source/apps/**/*.usda
+!/source/apps/**/*.usdc
+!/source/apps/**/*.usdz
+!/source/extensions/**/*.usd
+!/source/extensions/**/*.usda
+!/source/extensions/**/*.usdc
+!/source/extensions/**/*.usdz
+!/templates/**/*.usd
+!/templates/**/*.usda
+!/templates/**/*.usdc
+!/templates/**/*.usdz

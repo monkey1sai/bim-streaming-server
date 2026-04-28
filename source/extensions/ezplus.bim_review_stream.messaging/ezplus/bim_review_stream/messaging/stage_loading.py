@@ -20,6 +20,55 @@ import omni.client
 import omni.kit.app
 import omni.kit.livestream.messaging as messaging
 import omni.usd
+from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux
+
+
+_FALLBACK_LIGHTS_ROOT = "/__BIMFallbackLights"
+
+
+def _stage_has_lights(stage) -> bool:
+    for prim in stage.Traverse():
+        if (
+            prim.IsA(UsdLux.DomeLight)
+            or prim.IsA(UsdLux.DistantLight)
+            or prim.IsA(UsdLux.RectLight)
+            or prim.IsA(UsdLux.SphereLight)
+            or prim.IsA(UsdLux.DiskLight)
+            or prim.IsA(UsdLux.CylinderLight)
+        ):
+            return True
+    return False
+
+
+def _ensure_default_lighting(stage) -> None:
+    # IFC-derived USDC typically carries no lights. Inject a dome + distant
+    # sun into the session layer so the fallback never persists to disk.
+    if stage is None or _stage_has_lights(stage):
+        return
+
+    session_layer = stage.GetSessionLayer()
+    with Usd.EditContext(stage, session_layer):
+        UsdGeom.Scope.Define(stage, Sdf.Path(_FALLBACK_LIGHTS_ROOT))
+
+        dome = UsdLux.DomeLight.Define(
+            stage, Sdf.Path(f"{_FALLBACK_LIGHTS_ROOT}/Dome")
+        )
+        dome.CreateIntensityAttr(1500.0)
+        dome.CreateColorAttr(Gf.Vec3f(1.0, 1.0, 1.0))
+
+        sun = UsdLux.DistantLight.Define(
+            stage, Sdf.Path(f"{_FALLBACK_LIGHTS_ROOT}/Sun")
+        )
+        sun.CreateIntensityAttr(3000.0)
+        sun.CreateAngleAttr(0.53)
+        UsdGeom.Xformable(sun.GetPrim()).AddRotateXYZOp().Set(
+            Gf.Vec3f(-45.0, 30.0, 0.0)
+        )
+
+    carb.log_info(
+        f"LoadingManager: added fallback dome+sun lighting under "
+        f"{_FALLBACK_LIGHTS_ROOT} (session layer, not persisted)"
+    )
 
 
 class LoadingManager:
@@ -249,6 +298,8 @@ class LoadingManager:
 
         for _ in range(2):
             await omni.kit.app.get_app().next_update_async()
+
+        _ensure_default_lighting(omni.usd.get_context().get_stage())
 
         # Stage has loaded with all dependencies. Send message to client.
         url = self._requested_stage_url if self._requested_stage_url  else '[obfuscated]'
