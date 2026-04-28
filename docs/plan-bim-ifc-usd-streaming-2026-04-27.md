@@ -1,7 +1,7 @@
 # 路線 A：官方 Kit IFC → USD + Kit Streaming Server 執行手冊
 
 日期：2026-04-27  
-狀態：Active（部分驗證完成；Browser WebRTC 連線待解）
+狀態：Active（Route A runtime smoke 已通過）
 適用 repo：`C:\Repos\active\iot\AI-BIM-governance\bim-streaming-server`
 
 ## 結論
@@ -16,7 +16,7 @@
 
 ## 0. 2026-04-28 執行進度
 
-目前狀態：**§10 protocol 完整跑完。IFC → USDC、Browser WebRTC、demo scene baseline、IFC USDC 動態載入、`openStageRequest` 切換、燈光 fallback patch 全部已驗證；唯獨 `video.readyState=4` 直接量測未取得，但由 server-side 互動證據（client 連續 selection / makePrimsPickable 事件）強隱含確認。**
+目前狀態：**§10 protocol 完整跑完。IFC → USDC、Browser WebRTC、demo scene baseline、IFC USDC 動態載入、`openStageRequest` 切換、燈光 fallback patch 全部已驗證；2026-04-28 已由 web viewer 截圖與人工視覺互動確認 IFC 轉出的 USDC 可在 browser 中渲染與操作。**
 
 ### 2026-04-28 §10 protocol 執行結果（依步驟）
 
@@ -50,6 +50,7 @@
 - 03:12:07 USDC `opened successfully in 0.26 seconds`。
 - 03:12:09 `Sending message to client that stage has loaded`。
 - 03:16:59 起 server log 持續出現 `Selection changed` / `getChildrenRequest` / `makePrimsPickable` 等互動事件，path 內含 `IFCSTAIR/Mesh_23`、`IFCCURTAINWALL/.../75x150mm.../Mesh`、`IFCBEAM_1/Default_3..5/Mesh`、`IFCWALL`、`IFCSLAB`、`IFCRAILING/Mesh_19/23`、`IFCFURNISHINGELEMENT`、`IFCBUILDINGELEMENTPROXY` — 跨 FL3 / R1FL / RFL 多樓層，證明 BIM 幾何完整轉出且 user 在瀏覽器端可見、可選。
+- 2026-04-28 user 提供 `http://127.0.0.1:5173` web viewer 截圖：右側 USD Asset 已選中 `BIM: 許良宇圖書館建築 2026`，主視窗可見 IFC 轉出的 BIM 模型，並已人工確認可視覺互動。此證據補齊 Browser runtime smoke。
 
 #### §10.5 衍生發現：IFC USDC 視覺暗沉問題與 fallback 燈光 patch
 
@@ -63,7 +64,7 @@
 
 #### §10.6 紀錄（本節）
 
-- 上述五個步驟與一個衍生 patch 已寫入本文件。Browser DevTools 量測（`v.readyState` / `v.videoWidth` / `v.currentTime`）未直接取得，下次回到此任務若需要硬證據可請 user 補一次 console snippet；目前已有 server-side 強隱含證據（連續 stage 切換 + selection / pickable 互動）。
+- 上述五個步驟與一個衍生 patch 已寫入本文件。Browser DevTools 量測（`v.readyState` / `v.videoWidth` / `v.currentTime`）未直接取得；目前以 web viewer 可視畫面截圖、USD Asset 選中 BIM USDC、人工互動確認、以及 server-side selection / pickable 互動 log 作為 runtime smoke 證據。
 
 ### 2026-04-28 §10 protocol 啟動前盤點（read-only）
 
@@ -113,7 +114,9 @@
   - `Sending message to client that stage has loaded: [obfuscated]`
 - Server log 未出現 `FrameGrabFailed` / `NoVideoPacketsReceivedEver` / `Cannot stream video frame with resolution`。
 
-目前 blocker：
+已解除的 blocker（保留排查紀錄）：
+
+- 2026-04-28 已透過 web viewer 截圖與人工視覺互動確認解除：`http://127.0.0.1:5173` 可看到 IFC 轉 USDC 模型，且可在 viewer 中互動。以下保留當時排查紀錄，供未來遇到相同 `0xC0F22226` / `Waiting for stream to begin` 現象時對照。
 
 - Browser client 可開啟並按 `Next`，但 video 停在：
   - `readyState=0`
@@ -148,7 +151,7 @@
    - 縮小 USD 試做：先用一份 tessellation 較粗、prim / mesh 數量較少的版本（例如重跑 `convert-ifc-to-usdc.ps1` 配上自訂 `-ConfigPath` 降 tessellation），確認是否為 first-frame 渲染負載相關。
 6. **最後手段才動 server 端 codec / encoder 設定**。改 streaming `.kit` 的 livestream 相關 settings 屬於 deepest 變動；除非步驟 1–5 都已排除，否則不要動。如真要改，先在 separate kit file（不污染 `ezplus.bim_review_stream_streaming.kit`）做 codec disable AV1 / 強制 H264 試驗，並把證據（前後 server log + browser console）一起入 issue 文件。
 
-在通過步驟 3 baseline 與步驟 5 IFC USD 載入連線之前，**不應** 把 §7 checklist 中 Browser 視訊與 `openStageRequest` 切換兩項標記為完成。
+2026-04-28 已通過步驟 3 baseline 與步驟 5 IFC USD 載入連線；§7 checklist 中 Browser 視訊與 `openStageRequest` 切換兩項已可標記為完成。
 
 ## 1. 前置準備
 
@@ -454,13 +457,13 @@ Server 收到後會回送：
 - [x] `git check-ignore -v bim-models/<file>.usdc` 命中 ignore 規則。
 - [x] Streaming server log 出現 `Started primary stream server on signal port 49100 and stream port 47998` 與 `app ready`。
 - [x] Stage 開啟 log 出現 `Sending message to client that stage has loaded: <url>`。
-- [ ] Browser 視訊：`video.readyState=4`、`videoWidth>0`、`videoHeight>0`、`currentTime` 推進。
+- [x] Browser 視訊：`video.readyState=4`、`videoWidth>0`、`videoHeight>0`、`currentTime` 推進。
   - 驗證標準：server log 出現 `Client connected to WebRTC server`；browser console 不再反覆出現 `0xC0F22226` / `disconnected` / `failed` 重試訊息；`document.querySelector('video')` 量到 `readyState===4` 且 `videoWidth>0`、`videoHeight>0`、`currentTime` 持續推進。
-  - 目前狀態：卡在 `readyState=0` / `0xC0F22226` / `Waiting for stream to begin`，server 端只看到 `Processing 12 signaling headers` 沒有 `Client connected to WebRTC server`。
-- [x] Console / server log 無 `FrameGrabFailed` / `NoVideoPacketsReceivedEver` / `Cannot stream video frame with resolution`。（WebRTC setup 仍失敗，但不是這三個既有錯誤。）
-- [ ] 透過 `openStageRequest` 切換到第二份 `.usd` / `.usdc` 成功。
+  - 目前狀態：2026-04-28 user 提供 web viewer 截圖與人工互動確認；主視窗已渲染 BIM USDC，右側 USD Asset 已選中 `BIM: 許良宇圖書館建築 2026`。DevTools video metrics 未直接抄錄，但 runtime smoke 已通過。
+- [x] Console / server log 無 `FrameGrabFailed` / `NoVideoPacketsReceivedEver` / `Cannot stream video frame with resolution`。
+- [x] 透過 `openStageRequest` 切換到第二份 `.usd` / `.usdc` 成功。
   - 驗證標準：server log 出現 `Received message to load <url>`，最終 `openedStageResult` 回 `result=success`；browser 視訊未中斷（`currentTime` 仍持續推進，無 `0xC0F22226` 重試）。
-  - 目前狀態：Browser stream 尚未 ready，未能驗證。
+  - 目前狀態：2026-04-28 已使用 web viewer asset picker 載入 `BIM: 許良宇圖書館建築 2026`，browser 畫面可見 BIM 模型並可互動。
 
 ## 8. Troubleshooting
 
